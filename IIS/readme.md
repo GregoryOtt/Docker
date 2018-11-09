@@ -7,4 +7,4 @@
 - Exposed PORTS: 8172, 80
 - Administrator account : dagod/P@ssword1
 ````
-docker pull gregoryott/iis:withmanagementenabled-0.1.0
+docker pull gregoryott/iis:withmanagementenabled
