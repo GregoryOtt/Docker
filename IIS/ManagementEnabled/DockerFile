@@ -1,0 +1,43 @@
+﻿# escape=`
+FROM microsoft/iis:latest
+
+LABEL version="0.1.0"
+LABEL maintainer=gregory.ott@live.com
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
+
+RUN `
+    # Activate IIS remote management
+    Install-WindowsFeature Web-Mgmt-Service; `
+    Set-ItemProperty HKLM:\Software\Microsoft\WebManagement\Server -name EnableRemoteManagement -value 1; `
+    #
+    # Activate ASP.NET 45
+    Install-WindowsFeature -Name Web-Asp-Net45; `
+    #
+    # Start management service and with automatic startup
+    Get-Service -Name "WMSVC" | Start-Service; `
+    Get-Service -Name "WMSVC" | Set-Service -StartupType Automatic; `
+    #
+    # Create a new user to administer the vm
+    New-LocalUser -Name "dagod" -Password (ConvertTo-SecureString "P@ssword1" -AsPlainText -Force) -AccountNeverExpires -PasswordNeverExpires; `
+    Add-LocalGroupMember -Group "Administrators" -Member "dagod"; `
+    #
+    # Create a service user for the AppPool
+    New-LocalUser -Name "svc" -Password (ConvertTo-SecureString "P@ssword1" -AsPlainText -Force) -AccountNeverExpires -PasswordNeverExpires; `
+    Add-LocalGroupMember -Group "IIS_IUSRS" -Member "svc"; `
+    #
+    # Map account to AppPool
+    Import-Module WebAdministration; `
+    Set-ItemProperty IIS:\AppPools\DefaultAppPool -name processModel.identityType -value 3; `
+    Set-ItemProperty IIS:\AppPools\DefaultAppPool -name processModel.userName -value "svc"; `
+    Set-ItemProperty IIS:\AppPools\DefaultAppPool -name processModel.password -value "P@ssword1"; `
+    #
+    # Download WebDeploy
+    New-Item -Path c:\downloads -ItemType Directory; `
+    Invoke-WebRequest -Uri https://download.microsoft.com/download/0/1/D/01DC28EA-638C-4A22-A57B-4CEF97755C6C/WebDeploy_amd64_en-US.msi -UserAgent '' -OutFile c:\downloads\WebDeploy_amd64_en-US.msi; `
+    #
+    # Install WebDeploy
+    Get-Service msiserver | Start-Service; `
+    msiexec /i c:\downloads\WebDeploy_amd64_en-US.msi ADDLOCAL=ALL /qn /norestart LicenseAccepted="0" /lv* c:\downloads\WebDeploy_amd64_en-US.log
+
+EXPOSE 8172
